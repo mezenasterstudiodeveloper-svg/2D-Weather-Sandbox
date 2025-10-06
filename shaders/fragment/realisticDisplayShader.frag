@@ -433,7 +433,7 @@ void main()
 
         float heightAboveGround = localY / treeTexHeightNorm;
 
-        treeTexCoordX -= base.x * heightAboveGround * 1.00; // 2.5  trees waving with the wind effect
+        treeTexCoordX -= base.x * heightAboveGround * (1.0 + sin(iterNum * 0.05 + fragCoord.x * 0.1) * 0.5); // trees waving with the wind effect
 
         treeTexCoordX *= 0.72;                              // Trees only go up to 72% of the texture height
         treeTexCoordY *= 0.72;                              // Trees only go up to 72% of the texture height

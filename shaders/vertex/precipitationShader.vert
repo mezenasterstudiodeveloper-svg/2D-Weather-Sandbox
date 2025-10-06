@@ -5,14 +5,17 @@ precision highp float;
 in vec2 dropPosition;
 in vec2 mass; //[0] water   [1] ice
 in float density;
+in float charge;
 
 // transform feedback varyings:
 out vec2 position_out;
 out vec2 mass_out;
 out float density_out;
+out float charge_out;
 
 // via fragmentshader to feedback framebuffers for feedback to fluid
 out vec4 feedback;
+out float charge_feedback;
 out vec2 deposition; // for rain and snow accumulation on surface
 
 vec2 texCoord;
@@ -52,6 +55,7 @@ uniform float evapRate;           // 0.0005
 vec2 newPos;
 vec2 newMass;
 float newDensity;
+float newCharge;
 
 bool isActive = true;
 bool spawned = false; // spawned in this iteration
@@ -68,6 +72,7 @@ void main()
   newPos = dropPosition;
   newMass = mass;         // amount of water and ice carried
   newDensity = density;   // determines fall speed
+  newCharge = charge;
 
   if (mass[WATER] < 0.) { // inactive
                           /*
@@ -102,11 +107,11 @@ void main()
                                                                                                                                     // if (spawnChance > rand2d(mass.xy)) {
                                                                                                                                     //  float spawnChance = (water[CLOUD] - threshold) / inactiveDroplets * resolution.x * resolution.y * spawnChanceMult;
 
-      float spawnChance = ((water[CLOUD] - threshold) / (inactiveDroplets + 10.0)) * resolution.x * resolution.y * spawnChanceMult; // 20.0  50.0
+      float spawnChance = (pow(max(water[CLOUD] - threshold, 0.0), 1.5) / (inactiveDroplets + 10.0)) * resolution.x * resolution.y * spawnChanceMult * 5.0; // 20.0  50.0
 
       //    float nrmRand = random2d(vec2(mass[WATER] * 0.2324, iterNum * 0.1783 + random(mass[ICE]))); // normalized random value
 
-      float nrmRand = fract(pow(water[CLOUD] * 10.0, 2.0));
+      float nrmRand = random2d(texCoord + iterNum);
 
       if (spawnChance > nrmRand) {                                       // spawn precipitation particle
         spawned = true;
@@ -117,6 +122,7 @@ void main()
           newMass[ICE] = initalMass;                                     // snow
           feedback[HEAT] += newMass[ICE] * meltingHeat;                  // add heat of freezing
           newDensity = snowDensity;
+          newCharge = 0.0;
 
           vec4 lightningData = texture(lightningDataTex, vec2(0.5)); // data from last lightning bolt
 
@@ -142,6 +148,7 @@ void main()
           newMass[WATER] = initalMass; // rain
           newMass[ICE] = 0.0;
           newDensity = 1.0;
+          newCharge = 0.0;
         }
         feedback[VAPOR] -= initalMass;
       }
@@ -190,6 +197,9 @@ void main()
       disableDroplet();
 
     } else { // update droplet
+      float melting = 0.0;
+      float evap = 0.0;
+      float subli = 0.0;
 
       // float surfaceArea = sqrt(totalMass); // As if droplet is a circle (2D)
       float surfaceArea = pow(totalMass, 1. / 3.); // As if droplet is a sphere (3D)
@@ -219,10 +229,12 @@ void main()
         newMass[ICE] += freezing;
         feedback[HEAT] += freezing * meltingHeat;
 
+        newDensity = min(newDensity + (freezing / totalMass), 1.0); // density increases as it freezes, up to 1.0
+
       } else {                                                                                                    // above freezing
         newMass[WATER] += growth;                                                                                 // water growth
 
-        float melting = min((realTemp - CtoK(0.0)) * meltingRate * surfaceArea /* / newDensity */, newMass[ICE]); // 0.0002 snow / hail melting
+        melting = min((realTemp - CtoK(0.0)) * meltingRate * surfaceArea /* / newDensity */, newMass[ICE]); // 0.0002 snow / hail melting
         newMass[ICE] -= melting;
         newMass[WATER] += melting;
         feedback[HEAT] -= melting * meltingHeat;
@@ -240,8 +252,8 @@ void main()
 
       // evapAndSubli = 0.0000;                                                                         // remove quickly for DEBUG
 
-      float evap = min(newMass[WATER], evapAndSubli);       // can only evaporate as much water as it contains
-      float subli = min(newMass[ICE], evapAndSubli - evap); // the rest is ice sublimation, upto the amount of ice it contains
+      evap = min(newMass[WATER], evapAndSubli);       // can only evaporate as much water as it contains
+      subli = min(newMass[ICE], evapAndSubli - evap); // the rest is ice sublimation, upto the amount of ice it contains
 
       newMass[WATER] -= evap;                               // water evaporation
       newMass[ICE] -= subli;                                // ice sublimation
@@ -268,7 +280,15 @@ void main()
 
       newPos.x = mod(newPos.x + 1., 2.) - 1.; // wrap horizontal position around map edges
 
+      // CHARGE
+      if (base.y > 0.) {                                           // in updraft
+        newCharge += base.y * (1. - newDensity) * totalMass * 0.1; // lighter particles (snow) get positive charge, hailstones negative
+      }
+      newCharge -= newCharge * (evap + subli) / totalMass; // evaporation removes charge
+      newCharge -= newCharge * melting / totalMass;        // melting removes charge
+
       feedback[MASS] = totalMass;
+      charge_feedback = newCharge;
 
     }               // update
 
@@ -290,4 +310,5 @@ void main()
   position_out = newPos;
   mass_out = newMass;
   density_out = max(newDensity, 0.);
+  charge_out = newCharge;
 }

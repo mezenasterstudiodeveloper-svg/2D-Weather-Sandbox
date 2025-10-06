@@ -18,10 +18,6 @@ uniform float wind;
 uniform vec2 texelSize;
 // uniform vec2 resolution;
 
-uniform vec4 initial_Tv[126];
-
-float getInitialT(int y) { return initial_Tv[y / 4][y % 4]; }
-
 layout(location = 0) out vec4 base;
 layout(location = 2) out ivec4 wall;
 
