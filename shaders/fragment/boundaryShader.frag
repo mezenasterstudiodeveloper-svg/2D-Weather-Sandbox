@@ -28,9 +28,9 @@ uniform float vorticity;
 uniform float waterEvaporation;
 uniform float landEvaporation;
 uniform float waterWeight;
-uniform vec4 initial_Tv[126];
+uniform sampler2D soundingDataTex;
 
-float getInitialT(int y) { return initial_Tv[y / 4][y % 4]; }
+float getInitialT(int y) { return texture(soundingDataTex, vec2(0.5, (float(y) + 0.5) / 504.0)).r; }
 
 uniform float sunAngle;
 

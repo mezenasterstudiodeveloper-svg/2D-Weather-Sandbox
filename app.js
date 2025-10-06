@@ -4582,6 +4582,7 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
   const precipitationFeedbackTexture = gl.createTexture();
   const precipitationDepositionTexture = gl.createTexture();
   const precipitationChargeTexture = gl.createTexture();
+  const soundingDataTexture = gl.createTexture();
   const lightningDataTexture = gl.createTexture(); // single pixel texture holding location and timing of current lightning strike
 
   // Static texures:
@@ -4858,38 +4859,47 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
 
   // generate sounding data for forcing in sim
 
-  var realWorldSounding_T = new Float32Array(504);   // sim_res_y + 1
-  var realWorldSounding_W = new Float32Array(504);   // sim_res_y + 1
-  var realWorldSounding_Vel = new Float32Array(504); // sim_res_y + 1
+  const soundingTextureHeight = 504;
+  var initial_T = new Float32Array(soundingTextureHeight);
+  var realWorldSounding_T = new Float32Array(soundingTextureHeight);
+  var realWorldSounding_W = new Float32Array(soundingTextureHeight);
+  var realWorldSounding_Vel = new Float32Array(soundingTextureHeight);
+
   if (soundingData && soundingData.length > 100) {
     var soundingForSim = rawSoundingToSimSounding(soundingData, guiControls.simHeight, sim_res_y + 1);
 
     for (var y = 0; y < sim_res_y + 1; y++) {
-      //   let altitude = y / (sim_res_y + 1) * guiControls.simHeight;
-
       let soundingSample = soundingForSim[y];
-
-      realWorldSounding_T[y] = realToPotentialT(CtoK(soundingSample.t), y); // initial temperature profile
-      realWorldSounding_W[y] = maxWater(CtoK(soundingSample.td), y);        // initial temperature profile
+      realWorldSounding_T[y] = realToPotentialT(CtoK(soundingSample.t), y);
+      realWorldSounding_W[y] = maxWater(CtoK(soundingSample.td));
       realWorldSounding_Vel[y] = soundingSample.vel;
     }
-    // console.log(realWorldSounding_T);
-    // console.log(realWorldSounding_W);
-    // console.log(realWorldSounding_Vel);
   } else {
     console.log('No valid sounding loaded!');
   }
 
   // generate Initial temperature profile
-
-  var initial_T = new Float32Array(504); // sim_res_y + 1
-
-  for (var y = 0; y < sim_res_y + 1; y++) {
-    let altitude = y / (sim_res_y + 1) * guiControls.simHeight;
+  for (var y = 0; y < soundingTextureHeight; y++) {
+    let altitude = y / (soundingTextureHeight) * guiControls.simHeight;
     var realTemp = Math.max(map_range(altitude, 0, 12000, 15.0, -70.0), -60);
-
-    initial_T[y] = realToPotentialT(CtoK(realTemp), y); // initial temperature profile
+    initial_T[y] = realToPotentialT(CtoK(realTemp), y);
   }
+
+  // Pack sounding data into a single texture
+  var soundingDataForTexture = new Float32Array(soundingTextureHeight * 4);
+  for (var y = 0; y < soundingTextureHeight; y++) {
+    soundingDataForTexture[y * 4 + 0] = initial_T[y];
+    soundingDataForTexture[y * 4 + 1] = realWorldSounding_T[y];
+    soundingDataForTexture[y * 4 + 2] = realWorldSounding_W[y];
+    soundingDataForTexture[y * 4 + 3] = realWorldSounding_Vel[y];
+  }
+
+  gl.bindTexture(gl.TEXTURE_2D, soundingDataTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 1, soundingTextureHeight, 0, gl.RGBA, gl.FLOAT, soundingDataForTexture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
   cellHeight = guiControls.simHeight / sim_res_y; // in meters
 
@@ -4899,25 +4909,18 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
   gl.uniform2f(gl.getUniformLocation(setupProgram, 'resolution'), sim_res_x, sim_res_y);
   gl.uniform1f(gl.getUniformLocation(setupProgram, 'dryLapse'), dryLapse);
   gl.uniform1f(gl.getUniformLocation(setupProgram, 'simHeight'), guiControls.simHeight);
-
-  gl.uniform4fv(gl.getUniformLocation(setupProgram, 'initial_Tv'), initial_T);
+  gl.uniform1i(gl.getUniformLocation(setupProgram, 'soundingDataTex'), 10);
 
   gl.useProgram(advectionProgram);
   gl.uniform1i(gl.getUniformLocation(advectionProgram, 'baseTex'), 0);
   gl.uniform1i(gl.getUniformLocation(advectionProgram, 'waterTex'), 1);
   gl.uniform1i(gl.getUniformLocation(advectionProgram, 'wallTex'), 2);
+  gl.uniform1i(gl.getUniformLocation(advectionProgram, 'soundingDataTex'), 10);
   gl.uniform2f(gl.getUniformLocation(advectionProgram, 'texelSize'), texelSizeX, texelSizeY);
   gl.uniform2f(gl.getUniformLocation(advectionProgram, 'resolution'), sim_res_x, sim_res_y);
-  // gl.uniform1fv(
-  // gl.getUniformLocation(advectionProgram, 'initial_T'), initial_T);
-  gl.uniform4fv(gl.getUniformLocation(advectionProgram, 'initial_Tv'), initial_T);
   gl.uniform1f(gl.getUniformLocation(advectionProgram, 'dryLapse'), dryLapse);
   gl.uniform1f(gl.getUniformLocation(advectionProgram, 'waterTemperature'),
                CtoK(guiControls.waterTemperature)); // can be changed by GUI input
-
-  gl.uniform4fv(gl.getUniformLocation(advectionProgram, 'realWorldSounding_Tv'), realWorldSounding_T);
-  gl.uniform4fv(gl.getUniformLocation(advectionProgram, 'realWorldSounding_Wv'), realWorldSounding_W);
-  gl.uniform4fv(gl.getUniformLocation(advectionProgram, 'realWorldSounding_Velv'), realWorldSounding_Vel);
 
   gl.useProgram(pressureProgram);
   gl.uniform1i(gl.getUniformLocation(pressureProgram, 'baseTex'), 0);
@@ -4927,10 +4930,8 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
   gl.useProgram(velocityProgram);
   gl.uniform1i(gl.getUniformLocation(velocityProgram, 'baseTex'), 0);
   gl.uniform1i(gl.getUniformLocation(velocityProgram, 'wallTex'), 1);
+  gl.uniform1i(gl.getUniformLocation(velocityProgram, 'soundingDataTex'), 10);
   gl.uniform2f(gl.getUniformLocation(velocityProgram, 'texelSize'), texelSizeX, texelSizeY);
-
-  // gl.uniform1fv(gl.getUniformLocation(velocityProgram, 'initial_T'), initial_T);
-  gl.uniform4fv(gl.getUniformLocation(velocityProgram, 'initial_Tv'), initial_T);
 
   gl.useProgram(vorticityProgram);
   gl.uniform2f(gl.getUniformLocation(vorticityProgram, 'texelSize'), texelSizeX, texelSizeY);
@@ -4945,6 +4946,7 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
   gl.uniform1i(gl.getUniformLocation(boundaryProgram, 'precipFeedbackTex'), 5);
   gl.uniform1i(gl.getUniformLocation(boundaryProgram, 'precipDepositionTex'), 6);
   gl.uniform1i(gl.getUniformLocation(boundaryProgram, 'precipChargeTex'), 7);
+  gl.uniform1i(gl.getUniformLocation(boundaryProgram, 'soundingDataTex'), 10);
   gl.uniform2f(gl.getUniformLocation(boundaryProgram, 'resolution'), sim_res_x, sim_res_y);
   gl.uniform2f(gl.getUniformLocation(boundaryProgram, 'texelSize'), texelSizeX, texelSizeY);
   gl.uniform1f(gl.getUniformLocation(boundaryProgram, 'vorticity'),
@@ -4952,8 +4954,6 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
   gl.uniform1f(gl.getUniformLocation(boundaryProgram, 'waterTemperature'),
                CtoK(guiControls.waterTemperature)); // can be changed by GUI input
   gl.uniform1f(gl.getUniformLocation(boundaryProgram, 'dryLapse'), dryLapse);
-  // gl.uniform1fv(gl.getUniformLocation(boundaryProgram, 'initial_T'), initial_T);
-  gl.uniform4fv(gl.getUniformLocation(boundaryProgram, 'initial_Tv'), initial_T);
 
   gl.useProgram(curlProgram);
   gl.uniform2f(gl.getUniformLocation(curlProgram, 'texelSize'), texelSizeX, texelSizeY);
@@ -5104,6 +5104,9 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
 
   function draw()
   { // Runs for every frame
+    gl.activeTexture(gl.TEXTURE10);
+    gl.bindTexture(gl.TEXTURE_2D, soundingDataTexture);
+
     let camPanSpeed = guiControls.camSpeed;
 
     if (rightCtrlPressed) {

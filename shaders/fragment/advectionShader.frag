@@ -46,19 +46,15 @@ layout(location = 1) out vec4 water;
 layout(location = 2) out ivec4 wall;
 
 uniform vec2 resolution;
+uniform sampler2D soundingDataTex;
 
 vec2 texelSize;
 
-uniform vec4 initial_Tv[126];
-uniform vec4 realWorldSounding_Tv[126];
-uniform vec4 realWorldSounding_Wv[126];
-uniform vec4 realWorldSounding_Velv[126];
+float getInitialT(int y) { return texture(soundingDataTex, vec2(0.5, (float(y) + 0.5) / 504.0)).r; }
 
-float getInitialT(int y) { return initial_Tv[y / 4][y % 4]; }
-
-float getRealWorldSounding_T(int y) { return realWorldSounding_Tv[y / 4][y % 4]; }
-float getRealWorldSounding_W(int y) { return realWorldSounding_Wv[y / 4][y % 4]; }
-float getRealWorldSounding_Vel(int y) { return realWorldSounding_Velv[y / 4][y % 4]; }
+float getRealWorldSounding_T(int y) { return texture(soundingDataTex, vec2(0.5, (float(y) + 0.5) / 504.0)).g; }
+float getRealWorldSounding_W(int y) { return texture(soundingDataTex, vec2(0.5, (float(y) + 0.5) / 504.0)).b; }
+float getRealWorldSounding_Vel(int y) { return texture(soundingDataTex, vec2(0.5, (float(y) + 0.5) / 504.0)).a; }
 
 #include "common.glsl"
 
