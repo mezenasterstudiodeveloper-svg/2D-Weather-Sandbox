@@ -18,6 +18,7 @@ uniform isampler2D wallTex;
 uniform sampler2D lightTex;
 uniform sampler2D precipFeedbackTex;
 uniform sampler2D precipDepositionTex;
+uniform sampler2D precipChargeTex;
 
 uniform float dryLapse;
 uniform float evapHeat;
@@ -75,6 +76,7 @@ void main()
   water = texture(waterTex, texCoord);
 
   vec4 precipFeedback = texture(precipFeedbackTex, texCoord);
+  float precipCharge = texture(precipChargeTex, texCoord).r;
 
 
   float realTemp = potentialToRealT(base[TEMPERATURE]);
@@ -113,6 +115,8 @@ void main()
 
     //  0.004 for rain visualisation
     water[PRECIPITATION] = max(water[PRECIPITATION] * 0.995 - 0.00001 + precipFeedback[MASS] * 0.005, 0.0);
+
+    water[SMOKE] += precipCharge;
 
 
     // rain removes smoke from air

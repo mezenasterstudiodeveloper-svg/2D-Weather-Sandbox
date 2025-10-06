@@ -4275,13 +4275,14 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
 
   const precipitationVertexShader = await loadShader('precipitationShader.vert');
   const precipitationShader = await loadShader('precipitationShader.frag');
-  const precipitationProgram = createProgram(precipitationVertexShader, precipitationShader, [ 'position_out', 'mass_out', 'density_out' ]);
+  const precipitationProgram = createProgram(precipitationVertexShader, precipitationShader, [ 'position_out', 'mass_out', 'density_out', 'charge_out' ]);
 
   gl.useProgram(precipitationProgram);
 
   const dropPositionAttribLocation = 0;
   const massAttribLocation = 1;
   const densityAttribLocation = 2;
+  const chargeAttribLocation = 3;
 
   var even = true; // used to switch between precipitation buffers
 
@@ -4306,6 +4307,7 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
       rainDrops.push(-10.0 + Math.random()); // water negative to disable
       rainDrops.push(Math.random());         // ice
       rainDrops.push(Math.random());         // density
+      rainDrops.push(Math.random());         // charge
     }
   }
 
@@ -4318,12 +4320,13 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
     gl.enableVertexAttribArray(positionAttribLocation);
     gl.enableVertexAttribArray(massAttribLocation);
     gl.enableVertexAttribArray(densityAttribLocation);
+    gl.enableVertexAttribArray(chargeAttribLocation);
     gl.vertexAttribPointer(
       dropPositionAttribLocation,         // Attribute location
       2,                                  // Number of elements per attribute
       gl.FLOAT,                           // Type of elements
       gl.FALSE,
-      5 * Float32Array.BYTES_PER_ELEMENT, // Size of an individual vertex
+      6 * Float32Array.BYTES_PER_ELEMENT, // Size of an individual vertex
       0                                   // Offset from the beginning of a single vertex to this attribute
     );
     gl.vertexAttribPointer(
@@ -4331,7 +4334,7 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
       2,                                  // Number of elements per attribute
       gl.FLOAT,                           // Type of elements
       gl.FALSE,
-      5 * Float32Array.BYTES_PER_ELEMENT, // Size of an individual vertex
+      6 * Float32Array.BYTES_PER_ELEMENT, // Size of an individual vertex
       2 * Float32Array.BYTES_PER_ELEMENT  // Offset from the beginning of a
       // single vertex to this attribute
     );
@@ -4340,8 +4343,17 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
       1,                                  // Number of elements per attribute
       gl.FLOAT,                           // Type of elements
       gl.FALSE,
-      5 * Float32Array.BYTES_PER_ELEMENT, // Size of an individual vertex
+      6 * Float32Array.BYTES_PER_ELEMENT, // Size of an individual vertex
       4 * Float32Array.BYTES_PER_ELEMENT  // Offset from the beginning of a
+      // single vertex to this attribute
+    );
+    gl.vertexAttribPointer(
+      chargeAttribLocation,               // Attribute location
+      1,                                  // Number of elements per attribute
+      gl.FLOAT,                           // Type of elements
+      gl.FALSE,
+      6 * Float32Array.BYTES_PER_ELEMENT, // Size of an individual vertex
+      5 * Float32Array.BYTES_PER_ELEMENT  // Offset from the beginning of a
       // single vertex to this attribute
     );
 
@@ -4360,12 +4372,13 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
     gl.enableVertexAttribArray(positionAttribLocation);
     gl.enableVertexAttribArray(massAttribLocation);
     gl.enableVertexAttribArray(densityAttribLocation);
+    gl.enableVertexAttribArray(chargeAttribLocation);
     gl.vertexAttribPointer(
       dropPositionAttribLocation,         // Attribute location
       2,                                  // Number of elements per attribute
       gl.FLOAT,                           // Type of elements
       gl.FALSE,
-      5 * Float32Array.BYTES_PER_ELEMENT, // Size of an individual vertex
+      6 * Float32Array.BYTES_PER_ELEMENT, // Size of an individual vertex
       0                                   // Offset from the beginning of a single vertex to this attribute
     );
     gl.vertexAttribPointer(
@@ -4373,7 +4386,7 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
       2,                                  // Number of elements per attribute
       gl.FLOAT,                           // Type of elements
       gl.FALSE,
-      5 * Float32Array.BYTES_PER_ELEMENT, // Size of an individual vertex
+      6 * Float32Array.BYTES_PER_ELEMENT, // Size of an individual vertex
       2 * Float32Array.BYTES_PER_ELEMENT  // Offset from the beginning of a
       // single vertex to this attribute
     );
@@ -4382,8 +4395,17 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
       1,                                  // Number of elements per attribute
       gl.FLOAT,                           // Type of elements
       gl.FALSE,
-      5 * Float32Array.BYTES_PER_ELEMENT, // Size of an individual vertex
+      6 * Float32Array.BYTES_PER_ELEMENT, // Size of an individual vertex
       4 * Float32Array.BYTES_PER_ELEMENT  // Offset from the beginning of a
+      // single vertex to this attribute
+    );
+    gl.vertexAttribPointer(
+      chargeAttribLocation,               // Attribute location
+      1,                                  // Number of elements per attribute
+      gl.FLOAT,                           // Type of elements
+      gl.FALSE,
+      6 * Float32Array.BYTES_PER_ELEMENT, // Size of an individual vertex
+      5 * Float32Array.BYTES_PER_ELEMENT  // Offset from the beginning of a
       // single vertex to this attribute
     );
 
@@ -4399,7 +4421,7 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
   }
 
 
-  const valsPerDroplet = 5;
+  const valsPerDroplet = 6;
 
   function logDropletsAndToggleFollow()
   {
@@ -4432,6 +4454,7 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
       let water = tempDroplets[i + 2];
       let ice = tempDroplets[i + 3];
       let density = tempDroplets[i + 4];
+      let charge = tempDroplets[i + 5];
 
       let dx = (mouseXinSim - x) * sim_aspect;
       let dy = mouseYinSim - y;
@@ -4444,6 +4467,7 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
         console.log("water:", water);
         console.log("Ice:", ice);
         console.log("Density:", density);
+        console.log("Charge:", charge);
         console.log(" ");
         numInBrush++;
 
@@ -4557,6 +4581,7 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
   const lightTexture_1 = gl.createTexture();
   const precipitationFeedbackTexture = gl.createTexture();
   const precipitationDepositionTexture = gl.createTexture();
+  const precipitationChargeTexture = gl.createTexture();
   const lightningDataTexture = gl.createTexture(); // single pixel texture holding location and timing of current lightning strike
 
   // Static texures:
@@ -4700,9 +4725,15 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 
+  gl.bindTexture(gl.TEXTURE_2D, precipitationChargeTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, sim_res_x, sim_res_y, 0, gl.RED, gl.FLOAT, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
   gl.bindFramebuffer(gl.FRAMEBUFFER, precipitationFeedbackFrameBuff);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, precipitationFeedbackTexture, 0);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, precipitationDepositionTexture, 0);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT2, gl.TEXTURE_2D, precipitationChargeTexture, 0);
 
   gl.bindTexture(gl.TEXTURE_2D, lightningDataTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 1, 1, 0, gl.RGBA, gl.FLOAT, null);
@@ -4913,6 +4944,7 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
   gl.uniform1i(gl.getUniformLocation(boundaryProgram, 'lightTex'), 4);
   gl.uniform1i(gl.getUniformLocation(boundaryProgram, 'precipFeedbackTex'), 5);
   gl.uniform1i(gl.getUniformLocation(boundaryProgram, 'precipDepositionTex'), 6);
+  gl.uniform1i(gl.getUniformLocation(boundaryProgram, 'precipChargeTex'), 7);
   gl.uniform2f(gl.getUniformLocation(boundaryProgram, 'resolution'), sim_res_x, sim_res_y);
   gl.uniform2f(gl.getUniformLocation(boundaryProgram, 'texelSize'), texelSizeX, texelSizeY);
   gl.uniform1f(gl.getUniformLocation(boundaryProgram, 'vorticity'),
@@ -5258,6 +5290,8 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
             gl.bindTexture(gl.TEXTURE_2D, precipitationFeedbackTexture);
             gl.activeTexture(gl.TEXTURE6);
             gl.bindTexture(gl.TEXTURE_2D, precipitationDepositionTexture);
+            gl.activeTexture(gl.TEXTURE7);
+            gl.bindTexture(gl.TEXTURE_2D, precipitationChargeTexture);
 
 
             gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuff_0);
@@ -5449,6 +5483,8 @@ async function mainScript(initialBaseTex, initialWaterTex, initialWallTex, initi
       ctx.fillText('Ice     : ' + dropletInfo[3].toFixed(2), 0, 30);
       ctx.fillStyle = '#00FF00';
       ctx.fillText('Dens : ' + dropletInfo[4].toFixed(2), 0, 45);
+      ctx.fillStyle = '#FF00FF';
+      ctx.fillText('Chg   : ' + dropletInfo[5].toFixed(2), 0, 60);
     }
 
     if (airplaneMode) {
